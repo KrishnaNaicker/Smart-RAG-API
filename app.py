@@ -267,25 +267,6 @@ class SmartRAGSystem:
             for num_phrase in query_numbers:
                 if num_phrase in chunk_lower:
                     number_boost = 0.3
-            
-            # Special keyword boosts for insurance-specific terms
-            special_keywords = {
-                'grace period': ['grace', 'premium', 'payment', 'due'],
-                'waiting period': ['waiting', 'pre-existing', 'disease', 'commencement'],
-                'exclusion': ['exclude', 'exclusion', 'not covered', 'except'],
-                'coverage': ['cover', 'benefit', 'include', 'treatment'],
-                'premium': ['premium', 'payment', 'due', 'amount']
-            }
-            
-            special_boost = 0
-            for key_phrase, related_words in special_keywords.items():
-                if key_phrase in query_lower:
-                    matching_related = sum(1 for word in related_words if word in chunk_lower)
-                    if matching_related > 0:
-                        special_boost = min(0.2 * matching_related, 0.4)
-            
-            if base_score > 0 or phrase_boost > 0 or number_boost > 0 or special_boost > 0:
-                keyword_scores[i] = base_score + phrase_boost + number_boost + special_boost
         
         # 3. Combine scores and rank
         final_chunks = {}
