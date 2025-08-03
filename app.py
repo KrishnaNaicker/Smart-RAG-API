@@ -243,7 +243,7 @@ class SmartRAGSystem:
         query_words = set(word_tokenize(query_lower)) - self.stop_words
         
         # Extract important phrases and numbers
-        number_pattern = r'\b\d+\s*(?:days?|months?|years?)\b'
+        number_pattern = r'\b\d+\s*(?:days?|months?|years?|%|percent)\b'
         query_numbers = re.findall(number_pattern, query_lower)
         
         keyword_scores = defaultdict(float)
@@ -267,6 +267,28 @@ class SmartRAGSystem:
             for num_phrase in query_numbers:
                 if num_phrase in chunk_lower:
                     number_boost = 0.3
+            
+            # General domain-specific keyword boosts
+            domain_keywords = {
+                'time_related': ['period', 'duration', 'time', 'days', 'months', 'years'],
+                'policy_related': ['policy', 'coverage', 'benefit', 'exclusion', 'premium'],
+                'research_related': ['method', 'approach', 'results', 'findings', 'evaluation'],
+                'technical_related': ['system', 'model', 'algorithm', 'performance', 'accuracy']
+            }
+            
+            domain_boost = 0
+            for category, keywords in domain_keywords.items():
+                query_domain_words = [word for word in query_words if word in keywords]
+                chunk_domain_words = [word for word in chunk_words if word in keywords]
+                
+                if query_domain_words and chunk_domain_words:
+                    common_domain = set(query_domain_words).intersection(set(chunk_domain_words))
+                    if common_domain:
+                        domain_boost += 0.1 * len(common_domain)
+            
+            # Store final keyword score
+            if base_score > 0 or phrase_boost > 0 or number_boost > 0 or domain_boost > 0:
+                keyword_scores[i] = base_score + phrase_boost + number_boost + min(domain_boost, 0.3)
         
         # 3. Combine scores and rank
         final_chunks = {}
@@ -355,7 +377,7 @@ class SmartRAGSystem:
             )
             
             prompt_template = """
-You are an expert at extracting precise information from insurance policy documents. Answer the question based ONLY on the provided context.
+You are an expert at extracting precise information from documents. Answer the question based ONLY on the provided context.
 
 Context from document:
 {context}
@@ -364,12 +386,13 @@ Question: {question}
 
 Instructions:
 1. Provide a complete, specific answer that directly addresses the question
-2. Include relevant details like time periods, amounts, or conditions mentioned in the context
-3. If the question asks about a time period (grace period, waiting period), include the exact duration
-4. If the question asks about exclusions or coverage, provide a clear, concise summary
+2. Include relevant details like numbers, dates, periods, percentages, or technical specifications mentioned in the context
+3. If the question asks about time periods, durations, or quantities, include the exact values
+4. If the question asks about methods, approaches, or systems, provide a clear summary
 5. Write your answer as a complete statement, not just isolated facts
 6. If multiple relevant details are found, combine them into a coherent response
 7. If the exact information is not in the context, state clearly that it's not available
+8. Be concise but comprehensive - include all important details without being verbose
 
 Answer:"""
             
